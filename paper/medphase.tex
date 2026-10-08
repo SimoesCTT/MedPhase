@@ -1,0 +1,174 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{cite}
+
+\geometry{margin=1in}
+
+\title{\textbf{MedPhase: An Open-Source Android Application for Phase-Domain Processing of DICOM Medical Images}}
+\author{Americo Sim\~oes\\ \small Independent Researcher\\ \small \texttt{amexsimoes@gmail.com}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present MedPhase, a free and open-source Android application for phase-domain processing of medical imaging data in the DICOM format. MedPhase loads DICOM files, extracts complex-valued and phase information where available, performs phase unwrapping, applies spectral denoising based on a Riemann-zero comb filter, and compares results against standard denoising methods (Gaussian, median, and non-local means). All processing runs locally on the device; the application requests no network permission. MedPhase is a research and educational tool, not a medical device, and does not provide diagnostic output. Validation is performed against public datasets including FastMRI and LoDoPaB-CT.
+\end{abstract}
+
+\section{Introduction}
+
+Medical imaging produces enormous volumes of complex-valued data. While most clinical viewing software displays only the magnitude of this data, the \emph{phase} contains information that is invisible to magnitude-only display: tissue susceptibility (in MRI), blood flow direction (in phase-contrast MRI), and coherent scatter signatures (in X-ray imaging) \cite{haacke1999,bernstein2004}.
+
+Processing phase data is nontrivial. It requires:
+\begin{itemize}
+\item Phase unwrapping (the phase measured by any physical detector is wrapped to $(-\pi, \pi]$)
+\item Careful filtering (standard filters can corrupt phase discontinuities)
+\item Comparison against magnitude-domain methods to demonstrate value
+\end{itemize}
+
+Existing tools for phase processing are primarily MATLAB-based (SPM, FSL, MRtrix) and require a workstation. No open-source Android application currently offers DICOM phase processing.
+
+MedPhase fills this gap. It is designed for:
+\begin{itemize}
+\item Researchers testing phase-processing algorithms
+\item Radiologists and imaging scientists exploring phase data outside the clinical workflow
+\item Students learning about phase unwrapping and spectral filtering
+\end{itemize}
+
+\section{Methods}
+
+\subsection{DICOM Input}
+
+MedPhase reads DICOM files following the DICOM standard (PS3.10). For pixel data, it supports:
+\begin{itemize}
+\item Single-frame and multi-frame DICOM
+\item 8-bit, 16-bit, and 32-bit integer pixel data
+\item 32-bit float pixel data (Phase images are typically stored as float)
+\end{itemize}
+
+Private DICOM tags used by MRI vendors (Siemens, GE, Philips) to store phase information are supported where documented.
+
+\subsection{Phase Unwrapping}
+
+The measured phase $\phi_w(x,y)$ is wrapped to $(-\pi, \pi]$. The true phase $\phi(x,y)$ differs from the wrapped phase by integer multiples of $2\pi$:
+\begin{equation}
+\phi(x,y) = \phi_w(x,y) + 2\pi k(x,y)
+\end{equation}
+for some integer-valued function $k(x,y)$.
+
+MedPhase implements two unwrapping algorithms:
+\begin{enumerate}
+\item \textbf{Goldstein branch-cut} — detects residues ($\pm 2\pi$ inconsistencies around $2\times2$ pixel loops), connects them with branch cuts, and unwraps along paths that do not cross cuts \cite{goldstein1988}.
+\item \textbf{Quality-guided} — unwraps pixels in order of a quality map (phase derivative variance) \cite{ghiglia1994}.
+\end{enumerate}
+
+\subsection{Spectral Denoising}
+
+Denoising is applied in the 2D Fourier domain. The Riemann-zero comb filter is defined by:
+\begin{equation}
+H(f) = \prod_{n=1}^{N} \left[ 1 + \left( \frac{f - \gamma_n}{\Delta f} \right)^2 \right]^{-1}
+\end{equation}
+where $\gamma_n$ are the non-trivial Riemann zeros scaled to the image frequency range and $\Delta f$ is the Lorentzian bandwidth. This produces a frequency response with notches at specific frequencies, designed to suppress noise components that do not align with the image's structural frequencies.
+
+We compare against three standard denoisers:
+\begin{itemize}
+\item \textbf{Gaussian} — simple frequency-domain low-pass
+\item \textbf{Median} — 3$\times$3 and 5$\times$5
+\item \textbf{Non-local means} — the current reference method for medical image denoising \cite{buades2005}
+\end{itemize}
+
+\subsection{Metrics}
+
+Denoising is evaluated using:
+\begin{equation}
+\mathrm{PSNR} = 10 \log_{10} \left( \frac{\mathrm{MAX}^2}{\mathrm{MSE}} \right)
+\end{equation}
+\begin{equation}
+\mathrm{SSIM}(x, y) = \frac{(2\mu_x \mu_y + C_1)(2\sigma_{xy} + C_2)}{(\mu_x^2 + \mu_y^2 + C_1)(\sigma_x^2 + \sigma_y^2 + C_2)}
+\end{equation}
+
+where MAX is the maximum possible pixel value and $\mu, \sigma$ are local means and standard deviations \cite{wang2004}.
+
+\section{Validation Plan}
+
+MedPhase is validated against two public datasets:
+
+\subsection{FastMRI}
+
+The FastMRI dataset \cite{zbontar2020} from NYU and Meta contains raw and reconstructed MRI data (magnitude and phase). We use the multi-coil raw k-space data to test phase unwrapping on realistic MRI phase.
+
+\subsection{LoDoPaB-CT}
+
+The Low-Dose Parallel Beam CT dataset \cite{leuschner2020} contains CT projections and reconstructed images. We test the Riemann comb filter on reconstructed CT slices at various noise levels.
+
+\subsection{Comparison}
+
+For each dataset, we:
+\begin{enumerate}
+\item Apply each denoiser (Gaussian, median, NLM, Riemann comb) to a set of test images
+\item Compute PSNR and SSIM against a clean reference
+\item Report results per method and per noise level
+\end{enumerate}
+
+The intent is not to demonstrate that Riemann comb filtering is universally superior. The intent is to characterize where it helps and where it does not, so that other researchers can make informed decisions.
+
+\section{Availability}
+
+MedPhase is available under the GNU General Public License v3.0:
+
+\begin{itemize}
+\item Source code: \url{https://github.com/SimoesCTT/MedPhase}
+\item F-Droid: \url{https://f-droid.org/packages/com.simoesctt.medphase}
+\end{itemize}
+
+The application requires Android 7.0 (API 24) or higher and requests no network permission.
+
+\section{Discussion}
+
+MedPhase is a research and educational tool. It is explicitly \emph{not} a medical device and does not diagnose, treat, cure, or prevent any condition. All processing is performed on the user's device, and no data is transmitted over any network.
+
+Extensions planned for future releases include:
+\begin{itemize}
+\item Support for NIfTI and NRRD formats
+\item 3D phase unwrapping for volumetric MRI
+\item Quantitative susceptibility mapping (QSM) pipeline
+\item Offline dataset viewer for educational use
+\end{itemize}
+
+\begin{thebibliography}{9}
+
+\bibitem{haacke1999}
+E. M. Haacke, R. W. Brown, M. R. Thompson, and R. Venkatesan, \emph{Magnetic Resonance Imaging: Physical Principles and Sequence Design}. Wiley, 1999.
+
+\bibitem{bernstein2004}
+M. A. Bernstein, K. F. King, and X. J. Zhou, \emph{Handbook of MRI Pulse Sequences}. Elsevier, 2004.
+
+\bibitem{goldstein1988}
+R. M. Goldstein, H. A. Zebker, and C. L. Werner, ``Satellite radar interferometry: Two-dimensional phase unwrapping,'' \emph{Radio Science}, vol. 23, no. 4, pp. 713--720, 1988.
+
+\bibitem{ghiglia1994}
+D. C. Ghiglia and L. A. Romero, ``Robust two-dimensional weighted and unweighted phase unwrapping that uses fast transforms and iterative methods,'' \emph{Journal of the Optical Society of America A}, vol. 11, no. 1, pp. 107--117, 1994.
+
+\bibitem{buades2005}
+A. Buades, B. Coll, and J.-M. Morel, ``A non-local algorithm for image denoising,'' in \emph{IEEE Computer Society Conference on Computer Vision and Pattern Recognition}, 2005.
+
+\bibitem{wang2004}
+Z. Wang, A. C. Bovik, H. R. Sheikh, and E. P. Simoncelli, ``Image quality assessment: From error visibility to structural similarity,'' \emph{IEEE Transactions on Image Processing}, vol. 13, no. 4, pp. 600--612, 2004.
+
+\bibitem{zbontar2020}
+J. Zbontar et al., ``fastMRI: An open dataset and benchmarks for accelerated MRI,'' \emph{arXiv:1811.08839}, 2020.
+
+\bibitem{leuschner2020}
+J. Leuschner, M. Schmidt, D. O. Baguer, and P. Maass, ``LoDoPaB-CT, a benchmark dataset for low-dose computed tomography reconstruction,'' \emph{Scientific Data}, vol. 8, article 109, 2021.
+
+\end{thebibliography}
+
+\end{document}

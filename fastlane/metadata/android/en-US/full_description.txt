@@ -1,0 +1,21 @@
+A phase-domain processing tool for DICOM medical imaging data.
+
+Loads DICOM files, extracts pixel data, applies a choice of denoising
+filters, and reports PSNR against the original. All processing runs on
+device; the app requests no network permission.
+
+Features:
+* Load DICOM files (Explicit VR LE and Implicit VR LE)
+* 8-bit, 16-bit, and 32-bit integer pixel data
+* Window/level or min-max normalization
+* Denoising methods:
+  - Gaussian blur
+  - Median 3x3
+  - Non-local means
+  - Riemann-zero comb filter
+* PSNR comparison against the original
+
+Status: research and educational tool. Not a medical device. Does not
+diagnose, treat, cure, or prevent any condition.
+
+License: GPL-3.0-or-later
